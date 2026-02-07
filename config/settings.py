@@ -17,13 +17,13 @@ DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 # Allowed hosts
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
-# Railway provides RAILWAY_PUBLIC_DOMAIN
+# Railway provides RAILWAY_PUBLIC_DOMAIN (kept for backwards compatibility)
 RAILWAY_PUBLIC_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
 if RAILWAY_PUBLIC_DOMAIN:
     ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
 
-# Also allow any railway.app subdomain
-ALLOWED_HOSTS.append('.railway.app')
+# Allow Railway and GCP Cloud Run domains
+ALLOWED_HOSTS.extend(['.railway.app', '.run.app', '.a.run.app'])
 
 # Application definition
 INSTALLED_APPS = [
@@ -70,15 +70,37 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database
-# Use DATABASE_URL if available (Railway provides this), otherwise use SQLite
-DATABASE_URL = os.environ.get('DATABASE_URL')
+# Database Configuration
+# Priority: 1. Cloud SQL (GCP), 2. DATABASE_URL (Railway/others), 3. SQLite (local)
 
-if DATABASE_URL:
+# Check for GCP Cloud SQL configuration
+CLOUD_SQL_CONNECTION_NAME = os.environ.get('CLOUD_SQL_CONNECTION_NAME')
+DB_NAME = os.environ.get('DB_NAME')
+DB_USER = os.environ.get('DB_USER')
+DB_PASSWORD = os.environ.get('DB_PASSWORD')
+
+if CLOUD_SQL_CONNECTION_NAME and DB_NAME and DB_USER and DB_PASSWORD:
+    # GCP Cloud SQL via Unix socket
     DATABASES = {
-        'default': dj_database_url.config(default=DATABASE_URL, conn_max_age=600)
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': DB_NAME,
+            'USER': DB_USER,
+            'PASSWORD': DB_PASSWORD,
+            'HOST': f'/cloudsql/{CLOUD_SQL_CONNECTION_NAME}',
+            'PORT': '5432',
+        }
+    }
+elif os.environ.get('DATABASE_URL'):
+    # Railway or other DATABASE_URL providers
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=os.environ.get('DATABASE_URL'),
+            conn_max_age=600
+        )
     }
 else:
+    # Local development with SQLite
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -131,6 +153,6 @@ REST_FRAMEWORK = {
 # Security settings for production
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SECURE_SSL_REDIRECT = False  # Railway handles this
+    SECURE_SSL_REDIRECT = False  # Cloud Run/Railway handles this
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True

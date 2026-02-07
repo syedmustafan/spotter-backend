@@ -2,6 +2,11 @@
 
 Django REST Framework backend for the Spotter ELD Trip Planner application. This service handles trip planning with HOS (Hours of Service) compliance calculations.
 
+## 🌐 Live Demo
+
+- **Backend API**: https://spotter-api-236488896419.us-central1.run.app
+- **Frontend App**: https://frontend-two-hazel-29.vercel.app
+
 ## 🚛 Features
 
 - **Geocoding Service** - Convert addresses to coordinates using Nominatim API
@@ -21,13 +26,57 @@ Django REST Framework backend for the Spotter ELD Trip Planner application. This
 
 ## 🛠️ Tech Stack
 
-- Python 3.10+
+- Python 3.11+
 - Django 4.2
 - Django REST Framework
+- PostgreSQL (Cloud SQL)
+- Gunicorn
+- WhiteNoise (static files)
 - Requests (for external APIs)
 - Polyline (for route geometry decoding)
 
-## 📦 Installation
+## ☁️ Deployment
+
+### Infrastructure (Google Cloud Platform)
+
+| Service | Resource | Details |
+|---------|----------|---------|
+| **Compute** | Cloud Run | Serverless container hosting |
+| **Database** | Cloud SQL | PostgreSQL 15 (db-f1-micro) |
+| **Container Registry** | Artifact Registry | Docker images |
+| **Region** | us-central1 | Iowa, USA |
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `CLOUD_SQL_CONNECTION_NAME` | GCP Cloud SQL connection string |
+| `DB_NAME` | PostgreSQL database name |
+| `DB_USER` | PostgreSQL username |
+| `DB_PASSWORD` | PostgreSQL password |
+| `DJANGO_SECRET_KEY` | Django secret key |
+| `DEBUG` | Debug mode (false in production) |
+| `CORS_ALLOWED_ORIGINS` | Allowed frontend origins |
+
+### Deploy to GCP Cloud Run
+
+```bash
+# Authenticate with GCP
+gcloud auth login
+gcloud config set project spotter-eld-app
+
+# Deploy
+cd backend
+gcloud run deploy spotter-api \
+  --source . \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --add-cloudsql-instances spotter-eld-app:us-central1:spotter-db \
+  --set-env-vars "CLOUD_SQL_CONNECTION_NAME=spotter-eld-app:us-central1:spotter-db,..." 
+```
+
+## 📦 Local Installation
 
 ### Prerequisites
 - Python 3.10 or higher
@@ -113,9 +162,12 @@ GET /api/health/
 spotter-backend/
 ├── manage.py
 ├── requirements.txt
+├── Dockerfile            # Cloud Run container
+├── .gcloudignore         # GCP build exclusions
+├── .dockerignore         # Docker build exclusions
 ├── config/
 │   ├── __init__.py
-│   ├── settings.py
+│   ├── settings.py       # Django settings (GCP Cloud SQL support)
 │   ├── urls.py
 │   └── wsgi.py
 └── trips/
@@ -131,12 +183,6 @@ spotter-backend/
         ├── hos_calculator.py # HOS rules engine
         └── log_generator.py  # ELD log sheet generation
 ```
-
-## ⚙️ Configuration
-
-Environment variables (optional):
-- `DJANGO_SECRET_KEY` - Django secret key (default: dev key)
-- `DEBUG` - Enable debug mode (default: True)
 
 ## 🧪 Trip Assumptions
 
